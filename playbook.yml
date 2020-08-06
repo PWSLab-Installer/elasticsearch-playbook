@@ -1,0 +1,67 @@
+- hosts: localhost
+  connection: local
+
+  vars:
+    
+
+  tasks:
+    
+    - name: Check the version of CentOS
+      command: hostnamectl
+      register: os_check
+      ignore_errors: yes
+
+    -   name: Install Role Java
+        local_action: command ansible-galaxy install -f geerlingguy.java 
+
+    -   name: Install Role elasticsearch
+        local_action: command ansible-galaxy install -f geerlingguy.elasticsearch 
+
+    -   name: Applying role elasticsearch
+        command: mv ~/.ansible/roles/geerlingguy.elasticsearch ~/.ansible/roles/pwslab.elasticsearch
+        ignore_errors: yes
+
+    -   name: Applying role Java
+        command: mv ~/.ansible/roles/geerlingguy.java ~/.ansible/roles/pwslab.java
+        ignore_errors: yes
+
+    -   name: Installing Java
+        include_role:
+            name: pwslab.java
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 7")
+            - not os_check.stdout | regex_search("CentOS Linux 8")
+        vars:
+            java_packages:
+                - java-11-openjdk
+
+    -   name: Remove Old Java Any
+        yum:
+            name: java*
+            state: absent
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Install Java 11
+        yum:
+            name: java-11-openjdk-devel
+            state: latest
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Installing Java
+        include_role:
+            name: pwslab.java
+        when: 
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Applying replacement
+        lineinfile:
+            dest: /root/.ansible/roles/pwslab.elasticsearch/meta/main.yml
+            regexp: '^(.*)geerlingguy.java(.*)$'
+            line: '  - pwslab.java'
+            state: present
+    
+    - name: Installing elasticsearch
+      include_role:
+          name: pwslab.elasticsearch
